@@ -2,7 +2,7 @@
  * \file CTurboOutput.hpp
  * \brief Headers of the Turbomachinery Performance class.
  * \author S. Vitale, N. Anand
- * \version 7.5.1 "Blackbird"
+ * \version 7.5.2 "Blackbird"
  *
  * SU2 Project Website: https://su2code.github.io
  *
