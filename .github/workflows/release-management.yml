@@ -1,10 +1,11 @@
 name: Release Management
 
-on:
-  push:
-    # branches to consider in the event; optional, defaults to all
-    branches:
-      - develop
+on: push
+
+
+env:
+  RELEASE_VERSION: 7.5.1
+
 
 jobs:
   build_and_upload:
@@ -12,20 +13,20 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os_bin: [macos64, macos64-mpi, linux64, linux64-mpi, win64, win64-mpi]
+        os_bin: [macos64]
         include:
-          - os_bin: win64
-            flags: '-Dwith-mpi=disabled --cross-file=/hostfiles/hostfile_windows'
-          - os_bin: win64-mpi
-            flags: '-Dcustom-mpi=true --cross-file=/hostfiles/hostfile_windows_mpi'
+          # - os_bin: win64
+          #   flags: '-Dwith-mpi=disabled --cross-file=/hostfiles/hostfile_windows'
+          # - os_bin: win64-mpi
+          #   flags: '-Dcustom-mpi=true --cross-file=/hostfiles/hostfile_windows_mpi'
           - os_bin: macos64
             flags: '-Dwith-mpi=disabled --cross-file=/hostfiles/hostfile_darwin'
-          - os_bin: macos64-mpi
-            flags: '-Dcustom-mpi=true --cross-file=/hostfiles/hostfile_darwin_mpi'
-          - os_bin: linux64
-            flags: '-Dwith-mpi=disabled -Dstatic-cgns-deps=true --cross-file=/hostfiles/hostfile_linux'
-          - os_bin: linux64-mpi
-            flags: '-Dcustom-mpi=true --cross-file=/hostfiles/hostfile_linux_mpi'
+          # - os_bin: macos64-mpi
+          #   flags: '-Dcustom-mpi=true --cross-file=/hostfiles/hostfile_darwin_mpi'
+          # - os_bin: linux64
+          #   flags: '-Dwith-mpi=disabled -Dstatic-cgns-deps=true --cross-file=/hostfiles/hostfile_linux'
+          # - os_bin: linux64-mpi
+          #   flags: '-Dcustom-mpi=true --cross-file=/hostfiles/hostfile_linux_mpi'
     runs-on: ubuntu-latest
     steps:
       - name: Cache Object Files
@@ -42,26 +43,40 @@ jobs:
         run: |
           cd install
           zip -r ../${{matrix.os_bin}}.zip bin/*
-        # Uploads binaries as artifacts (just as a backup)
-      - name: Upload Binaries
-        uses: actions/upload-artifact@v3
-        with:
-          name: ${{matrix.os_bin}}
-          path: ${{matrix.os_bin}}.zip
-        # Update the release notes of latest draft release
-      - uses: talbring/jenkins-release-drafter@v5.2.0-jenkins-11
-        name: Update Release
-        id: update_release
+
+
+      - name: Check if release exists
+        id: check_release
+        run: |
+          release_tag=$(git describe --tags --exact-match 2>/dev/null || true)
+          if [[ -z "$release_tag" ]]; then
+            echo "::set-output name=exists::false"
+          else
+            echo "::set-output name=exists::true"
+          fi
+
+
+      - name: Create Release
+        if: steps.check_release.outputs.exists == 'false'
+        id: create_release
+        uses: actions/create-release@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        # Upload binaries as assets to draft release
+        with:
+          tag_name: ${{env.RELEASE_VERSION}}
+          release_name: ${{env.RELEASE_VERSION}}
+          draft: false
+          prerelease: false
+      
       - name: Upload Release Asset
-        id: upload-release-asset
-        uses: actions/upload-release-asset@v1.0.2
+        id: upload-release-asset 
+        uses: actions/upload-release-asset@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          upload_url: ${{ steps.update_release.outputs.uploadurl }}
+          upload_url: ${{ steps.create_release.outputs.upload_url }} # This pulls from the CREATE RELEASE step above, referencing it's ID to get its outputs object, which include a `upload_url`. See this blog post for more info: https://jasonet.co/posts/new-features-of-github-actions/#passing-data-to-future-steps 
           asset_path: ${{matrix.os_bin}}.zip
-          asset_name: SU2-${{ steps.update_release.outputs.tagname }}-${{matrix.os_bin}}.zip
+          asset_name: SU2-${{env.RELEASE_VERSION}}-${{matrix.os_bin}}.zip
           asset_content_type: application/zip
+
+
