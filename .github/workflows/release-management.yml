@@ -4,7 +4,7 @@ on: push
 
 
 env:
-  RELEASE_VERSION: 7.5.2
+  RELEASE_VERSION: 8.0.0-turbo
 
 
 jobs:
